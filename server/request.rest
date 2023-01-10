@@ -1,0 +1,42 @@
+GET http://localhost:3001/auth/posts
+Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTcsInVzZXJuYW1lIjoicmVzdFRlc3QzIiwiZW1haWwiOiJyZXN0VGVzdDNAZ21haWwuY29tIiwiaWF0IjoxNjY2MzQ2ODI5LCJleHAiOjE2NjYzNDY4NzR9.DPPTrUHtXCMbY5yeDirpfldY-_uoLA79bg0RUjtc2g
+
+
+
+
+###
+POST http://localhost:3001/auth/token
+Content-Type: application/json
+
+{
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTcsInVzZXJuYW1lIjoicmVzdFRlc3QzIiwiZW1haWwiOiJyZXN0VGVzdDNAZ21haWwuY29tIiwiaWF0IjoxNjY2MzQ2Nzk1fQ.OftWgQrTaKy_wRw5ez1HLACVheURGaBaGvldxQ4F2Rg"
+}
+
+###
+DELETE  http://localhost:3001/auth/logout
+Content-Type: application/json
+
+{
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTcsInVzZXJuYW1lIjoicmVzdFRlc3QzIiwiZW1haWwiOiJyZXN0VGVzdDNAZ21haWwuY29tIiwiaWF0IjoxNjY2MzQ2Nzk1fQ.OftWgQrTaKy_wRw5ez1HLACVheURGaBaGvldxQ4F2Rg"
+}
+
+###
+
+POST http://localhost:3001/auth/login
+Content-Type: application/json
+
+{
+    "username": "restTest3",
+    "password": "restTest"
+}
+
+###
+
+POST http://localhost:3001/auth/signup
+Content-Type: application/json
+
+{
+    "username": "restTest3",
+    "email": "restTest3@gmail.com",
+    "password": "restTest"
+}
