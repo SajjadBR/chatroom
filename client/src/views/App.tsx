@@ -110,6 +110,8 @@ async function getUser():Promise<any>{
 
 
 export default function App({appName}: AppProps) {
+  console.log("App");
+  
   Tokens.init();
   const [,setState] = useState();
   const [user,setUser] = useState<User>();

@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Contact } from "../SocketWrapper";
 
 
@@ -11,7 +11,7 @@ export default function ChatHeader({contact}:CHP) {
   const navigate = useNavigate();
   return (
     <div className="shadow rounded border border-2 w-100 p-2 align-items-center row m-0 ">
-      <button className="material-icons col-2 col-md-1 btn" type="button" onClick={e => navigate("/chats")}>arrow_back</button>
+      <Link className="material-icons col-2 col-md-1 btn" to="/chats">arrow_back</Link>
       <img src={src} alt="contact's profile" className="col-3 col-md-2 rounded-circle" />
       <div className="col-6">
         <span>{contact.name}</span>

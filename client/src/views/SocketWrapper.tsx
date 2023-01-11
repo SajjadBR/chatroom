@@ -22,6 +22,8 @@ type SocketWrapperProps = {
 }
 
 export default function SocketWrapper({user}:SocketWrapperProps) {
+    console.log("SW");
+    
     const navigate = useNavigate();
     const {pathname} = useLocation();
     const showChats = pathname.startsWith("/chats");
@@ -29,10 +31,10 @@ export default function SocketWrapper({user}:SocketWrapperProps) {
 
     const socket = useMemo(() => io (window.origin+"1",{ auth: {token: Tokens.access}}), []);
     
-    const [chats,setChats] = useState<Chat[] | undefined>();
     const [connected, setConnected] = useState<boolean>(socket.connected);
-
+    const [chats,setChats] = useState<Chat[] | undefined>();
     const [currentChat,setCurrentChat] = useState<Chat | undefined>();
+
     
     function sendMessage(text:string){
         if(currentChat?.id !== 0) return socket.emit("sendMessage", currentChat!.id, text);
@@ -73,7 +75,6 @@ export default function SocketWrapper({user}:SocketWrapperProps) {
         });
 
         socket.emit("getChats", (res:any) => {
-            res.chats.pop()//TODO update server then this line
             setChats(res.chats);
         });
         socket.on("newChat", (chat) => {
@@ -117,24 +118,40 @@ export default function SocketWrapper({user}:SocketWrapperProps) {
             setChats(current => current?.filter(value => value.id !== id));
         });
     }
-    
-    
 
     return (
         <>
         {showChats && connected && chats &&
-        <div className="w-100 h-100 d-flex overflow-hidden">
+        <div className="w-100 h-100 overflow-hidden">
+
+            
             {pathname === "/chats/search" ?
             <SearchChat socket={socket} />:
-            <>
-            <Sidebar show={pathname === "/chats"} deleteChat={deleteChat} chats={chats} />
-            <ChatPage user={user} sendMessage={sendMessage} currentChat={currentChat} socket={socket} />
-            </>
+            (
+                pathname === "/chats"?
+                <Sidebar deleteChat={deleteChat} chats={chats} />:
+                <ChatPage user={user} sendMessage={sendMessage} currentChat={currentChat} socket={socket} />
+            )
             }
         </div>
         }
         {showChats && connected && !chats && <h1>Getting your Chats...</h1>}
         {showChats && !connected && <h1>connecting...</h1>}
+
+        <div className="toast-container position-fixed bottom-0 end-0 p-3">
+            <div id="notification" className="toast" role="alert" aria-live="assertive" aria-atomic="true">
+                <div className="toast-header">
+                {/* <img src="..." className="rounded me-2" alt="..."> */}
+                <strong className="me-auto">Bootstrap</strong>
+                <small>11 mins ago</small>
+                <button type="button" className="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+                <div className="toast-body">
+                Hello, world! This is a toast message.
+                </div>
+            </div>
+        </div>
+
         </>
     )
 }

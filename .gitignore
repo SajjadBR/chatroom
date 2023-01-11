@@ -1,6 +1,6 @@
 /test
-/t
 .hintrc
+.rest
 
 /server/node_modules
 /server/.env

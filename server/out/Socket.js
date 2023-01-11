@@ -132,14 +132,9 @@ class SocketConnection {
                     }
                 }],
         });
-        // console.log(JSON.stringify(chats,null, 2));
         cb({
             error: null,
-            chats: [...chats, {
-                    id: user.id,
-                    name: user.name,
-                    username: user.username
-                }]
+            chats: chats
         });
     }
     async handleGetMessages(chatId, cb) {

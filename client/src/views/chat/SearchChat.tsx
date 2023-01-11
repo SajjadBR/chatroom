@@ -23,7 +23,7 @@ export default function SearchChat({socket}:SearchChatProps) {
     }
 
     return (
-        <div className="col-12 d-flex flex-column py-2">
+        <div id="main" className="w-100 d-flex flex-column py-2">
             <div className="d-flex justify-content-between px-3">
                 <Link className="material-icons btn col-1 d-inline" to="/chats">arrow_back</Link>
                 <div className="input-group w-75 shadow border col-11">
