@@ -1,24 +1,20 @@
-import React, {useEffect, useRef, useState} from "react";
-import { useSearchParams } from "react-router-dom";
-import { Socket } from "socket.io-client";
+import React, {useEffect, useState} from "react";
 
 type MIT = {
-    sendMessage:((text:string) => void),
-    socket:Socket
+    sendMessage:((text:string) => void)
 }
 
 
-function MessageInput({socket, sendMessage}:MIT) {
-    const [searchParams, setSearchParams] = useSearchParams({m: ""});
-    const [message, setMessage] = useState<string>(() => searchParams.get("m") as string);
-    const messageRef = useRef<HTMLTextAreaElement>(null);
-
+function MessageInput({sendMessage}:MIT) {
+    const [message, setMessage] = useState<string>("");
+    
     const submit:React.FormEventHandler<HTMLFormElement> = e => {
         e.preventDefault();
         sendMessage(message);
         setMessage("");
     }
 
+    /*
     function setHight(){
         let size = messageRef.current?.value.split(/\r\n|\r|\n/).length!;
         if(size > 10) size = 10
@@ -26,6 +22,7 @@ function MessageInput({socket, sendMessage}:MIT) {
         messageRef.current!.style.height = size*1.5 + "em";
         messageRef.current!.style.bottom = ""+ (size-2)*1.5 +"em";
     }
+    */
 
     useEffect(() => {
         // setHight()

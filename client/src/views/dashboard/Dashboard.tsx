@@ -18,7 +18,7 @@ export async function logout(token:string) {
 }
 type DashboardProps = {
     user:User,
-    setUser:React.Dispatch<React.SetStateAction<User | undefined>>
+    setUser:React.Dispatch<React.SetStateAction<User>>
 }
 
 export default function Dashboard({user,setUser}:DashboardProps) {

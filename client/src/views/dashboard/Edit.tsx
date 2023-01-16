@@ -6,7 +6,7 @@ import EditProfile from "./EditProfile";
 
 type EditProps = {
   user:User,
-  setUser: React.Dispatch<React.SetStateAction<User | undefined>>
+  setUser: React.Dispatch<React.SetStateAction<User>>
 }
 
 export default function Edit({user, setUser}:EditProps) {

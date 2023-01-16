@@ -8,8 +8,8 @@ type MessageRowProps = {
 }
 
 export default function MessageRow({message,sent,chat}:MessageRowProps) {
-    const users = chat.Users;
-    const user = users.find(u => u.id === message.UserId);
+
+    const user = (chat.contactId === message.UserId) && chat;
     const data = new Date(message.createdAt);
     
 

@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useState} from 'react';
 import { Route, Routes } from 'react-router-dom'
 import Header from './Header';
 import Home from './Home';
@@ -6,10 +6,7 @@ import NotFound from './NotFound';
 import Dashboard from './dashboard/Dashboard';
 import SocketWrapper from './SocketWrapper';
 import Auth from './auth/Auth';
-
-interface AppProps {
-  appName: string
-}
+import PromiseView from './PromiseView';
 
 export function postReq(req:any){
   return {
@@ -100,7 +97,6 @@ async function getUser():Promise<any>{
     if(res.ok) return await res.json();
     
     const message = await res.text();
-    console.log(message);
     if(message === "jwt expired"){
         await Tokens.updateTokenSync();
         return getUser();
@@ -108,33 +104,37 @@ async function getUser():Promise<any>{
     throw new Error(message);
 }
 
+function AppLogged({data}:{data:any}){
+  const [user, setUser] = useState<User>(data);
+  return(
+    <>
+      <SocketWrapper user={user} />
+      <Routes>
+        <Route path='/' element={null} />
+        <Route path='/chats/*' element={null} />
+        <Route path='/Dashboard/*' element={<Dashboard user={user} setUser={setUser} />} />
+      </Routes>
+    </>
+  )
+}
 
-export default function App({appName}: AppProps) {
+export default function App({appName}: {appName:string}) {
   console.log("App");
   
   Tokens.init();
   const [,setState] = useState();
-  const [user,setUser] = useState<User>();
   Tokens.setUpdater(setState)
 
-  useEffect(() => {
-    if(Tokens.logged){
-        getUser().then(res => setUser(res));
-    }
-    else{
-      setUser(undefined);
-    }
-  },[Tokens.logged]);
 
   return (
     <div className='w-100 h-100 d-flex flex-column'>
       <Header appName={appName} />
-      {Tokens.logged && !user && <h1>Loading...</h1> }
-      {Tokens.logged && user && <SocketWrapper user={user} />}
+      {Tokens.logged && <PromiseView promise={getUser()} Result={AppLogged}><h1>Loading...</h1></PromiseView> }
+
       <Routes>
         <Route path='/' element={<Home />}/>
-        <Route path='/chats/*' element={<></>}/>
-        <Route path='/Dashboard/*' element={user ? <Dashboard user={user} setUser={setUser} />:<></>}/>
+        <Route path='/chats/*' element={null}/>
+        <Route path='/Dashboard/*' element={null}/>
         <Route path='/login' element={<Auth type='login' />} />
         <Route path='/signup' element={<Auth type='signup' />} />
         <Route path='*' element={<NotFound />} />

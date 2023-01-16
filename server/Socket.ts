@@ -51,6 +51,7 @@ class SocketConnection {
   async handleSearchChats(text:string, cb:((arg:any) => void)) {
     const user:UserModel = this.socket.data.user;
     const result = await UserModel.findAll({
+      attributes:["id","username","name"],
       where:{
         [Op.and]:[
           {id: {
@@ -103,9 +104,10 @@ class SocketConnection {
         error: null,
         chat:{
           id:chat.id,
-          Users:[
-            contact.toJSON()
-          ]
+          name:contact.name,
+          username:contact.username,
+          contactId:contact.id,
+          type:"private"
         }
       });
       
@@ -128,9 +130,10 @@ class SocketConnection {
 
       const chat = {
         id:0,
-        Users:[
-          user.toJSON()
-        ]
+        name:user.name,
+        username:user.username,
+        type:"private",
+        contactId:user.id
       }
 
       cb({
@@ -141,6 +144,8 @@ class SocketConnection {
   }
 
   async handleGetChats(cb:((arg:any) => void)) {
+    console.log("get chats");
+    
     const user:UserModel = this.socket.data.user;
     const chats = await user.getChats({
       include: [{
@@ -150,12 +155,19 @@ class SocketConnection {
           through:{
             attributes: []
           }
-      }],      
+      }],
+    });
+
+    
+    const result = chats.map(c => {
+      const user = (c.toJSON() as any).Users[0];
+      
+      return {id:c.id,name:user.name,username:user.username,contactId:user.id,type:"private",}
     });
     
     cb({
       error: null,
-      chats: chats
+      chats: result
     })
   }
   

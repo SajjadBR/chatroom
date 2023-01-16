@@ -1,14 +1,36 @@
-import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { io } from "socket.io-client";
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { io,Socket } from "socket.io-client";
 import { Tokens, User } from "./App";
 import ChatPage from "./chat/ChatPage";
 import SearchChat from "./chat/SearchChat";
 import Sidebar from "./chat/Sidebar";
+import PromiseView from "./PromiseView";
+
+function startSocket(){
+    return new Promise<Socket>((resolve,reject) => {
+        const socket = io (window.origin+"1",{ auth: {token: Tokens.access}})
+        socket.once("connect", () => resolve(socket));
+        socket.once("connect_error", () => reject({message:"connection error"}));
+    });
+}
+export function pEmit(socket:Socket,ev:string,...args:any[]){
+    return new Promise<any>((resolve,reject) => {
+        socket.emit(ev,...args,(res:any) => {
+            if(res.error) return reject({message:res.error});
+            resolve(res);
+        });
+    });
+}
+
+export type ChatType = "private"|"channel"|"group";
 
 export type Chat = {
     id: number,
-    Users: Contact[]
+    name:string,
+    username:string,
+    type:ChatType,
+    contactId:number
 }
 
 export type Contact = {
@@ -17,41 +39,94 @@ export type Contact = {
     name: string,
 };
 
-type SocketWrapperProps = {
-    user:User
-}
+export default function SocketWrapper({user}:{user:User}) {
 
-export default function SocketWrapper({user}:SocketWrapperProps) {
+    function sw({data}:{data:any}){
+        return(
+            <SocketWrapper2 user={user} socket={data} />
+        )
+    }
+    
+    return(
+        <PromiseView promise={startSocket()} Result={sw}>
+            <h2>Connecting...</h2>
+        </PromiseView>
+    )
+}
+function SocketWrapper2({user,socket}:{user:User,socket:Socket}) {
     console.log("SW");
     
-    const navigate = useNavigate();
     const {pathname} = useLocation();
     const showChats = pathname.startsWith("/chats");
     const username = showChats && pathname !== "/chats/search" && pathname.replace("/chats","").replace("/","")
 
-    const socket = useMemo(() => io (window.origin+"1",{ auth: {token: Tokens.access}}), []);
-    
-    const [connected, setConnected] = useState<boolean>(socket.connected);
     const [chats,setChats] = useState<Chat[] | undefined>();
-    const [currentChat,setCurrentChat] = useState<Chat | undefined>();
-
     
-    function sendMessage(text:string){
-        if(currentChat?.id !== 0) return socket.emit("sendMessage", currentChat!.id, text);
-        
-        socket.emit("startChat", currentChat.Users[0].id, (res:any) => {
-            if(res.error) return console.error(res.error);
-            console.log(res.chat);
+    const exist = chats?.find(c=>c.username === username);
+    
+    function sendMessage(text:string,chat:Chat,setChat?:((chat:Chat)=>void)){
+        if(chat.id !== 0) {
+            socket.emit("sendMessage", chat.id, text);
             
+        }
+
+        startChat(chat.contactId).then(res => {
+            socket.emit("sendMessage", res.chat.id, text);
+            setChat?.(res.chat);
+        })
+        
+    }
+
+    function startChat(id:number){
+        return pEmit(socket,"startChat",id).then((res:any) => {
             setChats(current => [...current!, res.chat]);
-            setCurrentChat(res.chat);
-            socket.emit("sendMessage", res.chat.id, text, (res:any) => {
-                if(res.error) console.error(res.error);
-                
-            });
+            return res;
         });
     }
 
+    useEffect(() => {
+        
+        socket.emit("getChats", (res:any) => {
+            setChats(res.chats);
+        });
+
+        socket.on("newChat", (chat) => {
+            setChats(current => [...current!,chat]);
+        }); 
+        return () => {
+            socket.removeAllListeners("newChat");
+        }
+    },[socket]);
+    
+    
+        
+    function deleteChat(id:number){
+        socket.emit("deleteChat",id, (res:any) => {
+            if(res.err) return console.error(res.err);
+            
+            setChats(current => current?.filter(value => value.id !== id));
+        });
+    }
+
+    if(!showChats)return null;
+
+    return (
+        <>
+        <div className="w-100 h-100 overflow-hidden">
+            {pathname === "/chats/search" ?
+            <SearchChat socket={socket} />:
+            (
+                (!username) ?
+                <Sidebar deleteChat={deleteChat} chats={chats} />:
+                <ChatPage user={user} sendMessage={sendMessage} currentChat={exist || {id:0,username,name:"",type:"private",contactId:0}} socket={socket} />
+            )
+            }
+        </div>
+        </>
+    )
+}
+
+/*
     async function onConnectError(err: Error) {
         if(err.message === "jwt expired" || err.message === "no token"){
             console.log(err.message);
@@ -64,7 +139,8 @@ export default function SocketWrapper({user}:SocketWrapperProps) {
             socket.connect();
         }
     }
-    useEffect(() => {
+
+
         socket.on("connect_error", onConnectError);
         socket.on("connect", () => {
             setConnected(true);
@@ -74,74 +150,16 @@ export default function SocketWrapper({user}:SocketWrapperProps) {
             setConnected(false);
         });
 
-        socket.emit("getChats", (res:any) => {
-            setChats(res.chats);
-        });
-        socket.on("newChat", (chat) => {
-            setChats(current => [...current!,chat]);
-        }); 
-        return () => {
-            socket.removeAllListeners("connect_error");
-            socket.removeAllListeners("disconnect");
-            socket.removeAllListeners("connect");
-            socket.removeAllListeners("newChat");
-        }
-    },[]);
-    
-    
-    
-    useEffect(() => {
-        if(!chats) return;
-        if(!username) return setCurrentChat(undefined);
-        
-        const exist = chats?.find(chat => chat.Users[0].username === username);
-        if(exist) return setCurrentChat(exist);
+*/
 
-        socket.emit("getChat", username, (res:any) => {
-            if(res.error) {
-                if(res.error === "404") {
-                    navigate("/chats");
-                    return setCurrentChat(undefined);
-                }
-                return console.error(res.error);
-            }
-            setCurrentChat(res.chat);
-        });
 
-    },[username, chats]);
-
-        
-    function deleteChat(id:number){
-        socket.emit("deleteChat",id, (res:any) => {
-            if(res.err) return console.error(res.err);
-            
-            setChats(current => current?.filter(value => value.id !== id));
-        });
-    }
-
-    return (
-        <>
-        {showChats && connected && chats &&
-        <div className="w-100 h-100 overflow-hidden">
-
-            
-            {pathname === "/chats/search" ?
-            <SearchChat socket={socket} />:
-            (
-                pathname === "/chats"?
-                <Sidebar deleteChat={deleteChat} chats={chats} />:
-                <ChatPage user={user} sendMessage={sendMessage} currentChat={currentChat} socket={socket} />
-            )
-            }
-        </div>
-        }
-        {showChats && connected && !chats && <h1>Getting your Chats...</h1>}
-        {showChats && !connected && <h1>connecting...</h1>}
+/*
 
         <div className="toast-container position-fixed bottom-0 end-0 p-3">
             <div id="notification" className="toast" role="alert" aria-live="assertive" aria-atomic="true">
                 <div className="toast-header">
-                {/* <img src="..." className="rounded me-2" alt="..."> */}
+                {// <img src="..." className="rounded me-2" alt="...">
+                }
                 <strong className="me-auto">Bootstrap</strong>
                 <small>11 mins ago</small>
                 <button type="button" className="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
@@ -151,7 +169,4 @@ export default function SocketWrapper({user}:SocketWrapperProps) {
                 </div>
             </div>
         </div>
-
-        </>
-    )
-}
+*/

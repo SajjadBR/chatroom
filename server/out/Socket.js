@@ -39,6 +39,7 @@ class SocketConnection {
     async handleSearchChats(text, cb) {
         const user = this.socket.data.user;
         const result = await DB_1.User.findAll({
+            attributes: ["id", "username", "name"],
             where: {
                 [sequelize_1.Op.and]: [
                     { id: {
@@ -86,9 +87,10 @@ class SocketConnection {
                 error: null,
                 chat: {
                     id: chat.id,
-                    Users: [
-                        contact.toJSON()
-                    ]
+                    name: contact.name,
+                    username: contact.username,
+                    contactId: contact.id,
+                    type: "private"
                 }
             });
             this.io.in("uid" + contact.id).emit("newChat", {
@@ -110,9 +112,10 @@ class SocketConnection {
                 return cb({ error: "404", chat: null });
             const chat = {
                 id: 0,
-                Users: [
-                    user.toJSON()
-                ]
+                name: user.name,
+                username: user.username,
+                type: "private",
+                contactId: user.id
             };
             cb({
                 error: null,
@@ -121,6 +124,7 @@ class SocketConnection {
         });
     }
     async handleGetChats(cb) {
+        console.log("get chats");
         const user = this.socket.data.user;
         const chats = await user.getChats({
             include: [{
@@ -132,9 +136,13 @@ class SocketConnection {
                     }
                 }],
         });
+        const result = chats.map(c => {
+            const user = c.toJSON().Users[0];
+            return { id: c.id, name: user.name, username: user.username, contactId: user.id, type: "private", };
+        });
         cb({
             error: null,
-            chats: chats
+            chats: result
         });
     }
     async handleGetMessages(chatId, cb) {
