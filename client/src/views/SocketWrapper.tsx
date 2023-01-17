@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { io,Socket } from "socket.io-client";
 import { Tokens, User } from "./App";
@@ -39,35 +39,71 @@ export type Contact = {
     name: string,
 };
 
+function GetChats({user,socket}:{user:User,socket:Socket}){
+    function sw({data}:{data:any}){
+        const chats = data.chats;
+
+        return(
+            <SocketWrapper2 user={user} socket={socket} initialChats={chats} />
+        )
+    }
+
+    return(
+        <PromiseView promise={pEmit(socket,"getChats")} Result={sw}>
+            <h2>Getting your chats...</h2>
+        </PromiseView>
+    )
+}
+
 export default function SocketWrapper({user}:{user:User}) {
 
-    function sw({data}:{data:any}){
+    function gc({data}:{data:any}){
         return(
-            <SocketWrapper2 user={user} socket={data} />
+            <GetChats user={user} socket={data} />
         )
     }
     
     return(
-        <PromiseView promise={startSocket()} Result={sw}>
+        <PromiseView promise={startSocket()} Result={gc}>
             <h2>Connecting...</h2>
         </PromiseView>
     )
 }
-function SocketWrapper2({user,socket}:{user:User,socket:Socket}) {
+function SocketWrapper2({user,socket,initialChats}:{user:User,socket:Socket,initialChats:Chat[]}) {
     console.log("SW");
     
     const {pathname} = useLocation();
-    const showChats = pathname.startsWith("/chats");
-    const username = showChats && pathname !== "/chats/search" && pathname.replace("/chats","").replace("/","")
-
-    const [chats,setChats] = useState<Chat[] | undefined>();
+    const {showChats,username} = useMemo(() => {
+        const x = pathname.startsWith("/chats");
+        const y = x && pathname !== "/chats/search" && pathname.replace("/chats","").replace("/","")
+        return {showChats:x,username:y}
+    },[pathname]);
+ 
+    const [chats,setChats] = useState<Chat[]>(initialChats);
     
     const exist = chats?.find(c=>c.username === username);
+
+    console.log(chats,pathname);
     
-    function sendMessage(text:string,chat:Chat,setChat?:((chat:Chat)=>void)){
+    const deleteChat = useCallback((id:number)=>{
+        socket.emit("deleteChat",id, (res:any) => {
+            if(res.err) return console.error(res.err);
+            
+            setChats(current => current?.filter(value => value.id !== id));
+        });
+    },[socket]);
+
+    const startChat = useCallback((id:number)=>{
+        return pEmit(socket,"startChat",id).then((res:any) => {
+            setChats(current => [...current!, res.chat]);
+            return res;
+        });
+    },[socket]);
+    
+    const sendMessage = useCallback((text:string,chat:Chat,setChat?:((chat:Chat)=>void)) => {
         if(chat.id !== 0) {
             socket.emit("sendMessage", chat.id, text);
-            
+            return;
         }
 
         startChat(chat.contactId).then(res => {
@@ -75,38 +111,18 @@ function SocketWrapper2({user,socket}:{user:User,socket:Socket}) {
             setChat?.(res.chat);
         })
         
-    }
+    },[socket,startChat]);
 
-    function startChat(id:number){
-        return pEmit(socket,"startChat",id).then((res:any) => {
-            setChats(current => [...current!, res.chat]);
-            return res;
-        });
-    }
 
     useEffect(() => {
-        
-        socket.emit("getChats", (res:any) => {
-            setChats(res.chats);
-        });
-
         socket.on("newChat", (chat) => {
             setChats(current => [...current!,chat]);
         }); 
+        
         return () => {
             socket.removeAllListeners("newChat");
         }
     },[socket]);
-    
-    
-        
-    function deleteChat(id:number){
-        socket.emit("deleteChat",id, (res:any) => {
-            if(res.err) return console.error(res.err);
-            
-            setChats(current => current?.filter(value => value.id !== id));
-        });
-    }
 
     if(!showChats)return null;
 
