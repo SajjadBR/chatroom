@@ -21,8 +21,8 @@ class SocketConnection {
     this.socket = socket;
     this.io = io;
 
-    socket.on("subscribeChat", this.handleSubscribeChat.bind(this))
-    socket.on("unsubscribeChat", this.handleUnsubscribeChat.bind(this))
+    this.disconnect = this.disconnect.bind(this);
+    socket.on("getStatus", this.handleGetStatus.bind(this))
 
     socket.on("getChats", this.handleGetChats.bind(this))
     socket.on("getChat", this.handleGetChat.bind(this))
@@ -37,14 +37,16 @@ class SocketConnection {
     socket.on('connect_error', (err) => {
       console.log(`connect_error due to ${err.message}`);
     });
-
   }
 
-  handleSubscribeChat(id:number){
-    this.socket.join("p"+id)
-  }
-  handleUnsubscribeChat(id:number){
-    this.socket.leave("p"+id)
+  async handleGetStatus(id:number,cb:((arg:any)=>void)){
+    const sockets = await this.io.in("uid"+id).fetchSockets();
+    if(sockets.length) return cb({error:null,status:"online"});
+
+    const c = await UserModel.findByPk(id);
+    if(!c) return;
+    console.log(c);
+    cb({error:null,status:c.lastOnline});
   }
 
 
@@ -95,7 +97,7 @@ class SocketConnection {
     
     const contact = await UserModel.findByPk(id);
     if(!contact) return cb({error:"404"});
-    Chat.create().then(async chat => {
+    Chat.create({type:'private',link:null,name:null}).then(async chat => {
 
       await chat.addUser(user);
       await chat.addUser(contact);
@@ -113,11 +115,10 @@ class SocketConnection {
       
       this.io.in("uid"+contact.id).emit("newChat", {
           id:chat.id,
-          Users:[{
-            id:user.id,
-            name:user.name,
-            username:user.username
-          }]
+          name:user.name,
+          username:user.username,
+          contactId:user.id,
+          type:"private"
         })
     });    
   }
@@ -144,8 +145,6 @@ class SocketConnection {
   }
 
   async handleGetChats(cb:((arg:any) => void)) {
-    console.log("get chats");
-    
     const user:UserModel = this.socket.data.user;
     const chats = await user.getChats({
       include: [{
@@ -160,9 +159,9 @@ class SocketConnection {
 
     
     const result = chats.map(c => {
-      const user = (c.toJSON() as any).Users[0];
+      const u = c.Users![0];
       
-      return {id:c.id,name:user.name,username:user.username,contactId:user.id,type:"private",}
+      return {id:c.id,name:u.name,username:u.username,contactId:u.id,type:"private",}
     });
     
     cb({
@@ -194,20 +193,33 @@ class SocketConnection {
     if(!chatId) return cb({error:"no id"});
     const user:UserModel = this.socket.data.user;
 
-    const chats = await user.getChats({where:{id:chatId}});
+    const chats = await user.getChats({
+      include:[
+        {
+          model:UserModel,
+          where:{id:{[Op.ne]:user.id}},
+          attributes:["id"]
+        }
+      ],
+      where:{id:chatId}
+    });
     if(chats.length === 0) return cb({error:"no chat"});
     const chat = chats[0];
+    console.log(chat);
     
     const message = await chat.createMessage({
       text,
       UserId:user.id
     });
+    console.log(message.toJSON());
     
-    this.io.in(["p"+chatId]).emit("newMessage",message.toJSON())
+    this.io.in(["uid"+chat.Users![0].id]).emit("newMessage",message.toJSON())
 
   }
   
   disconnect(reason:DisconnectReason) {
+    const user:UserModel = this.socket.data.user
+    user.update({lastOnline:new Date()});
     console.log("disconnected " + reason)
   }
 }

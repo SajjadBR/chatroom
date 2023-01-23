@@ -3,11 +3,12 @@ import {
    HasManyGetAssociationsMixin, HasManyCreateAssociationMixin,  HasManyRemoveAssociationMixin,
    BelongsToManyCreateAssociationMixin, BelongsToManyRemoveAssociationMixin, BelongsToManyGetAssociationsMixin,
    BelongsToManyAddAssociationMixin,
+   NonAttribute,
  } from 'sequelize';
 import {hashSync} from 'bcrypt'
 // require('./sample')
 
-export const sequelize = new Sequelize("rex","root","",{
+export const sequelize = new Sequelize("rex2","root","",{
   host: "localhost",
   dialect: "mysql",
   logging: false
@@ -25,6 +26,7 @@ export class User extends Model<InferAttributes<User>, InferCreationAttributes<U
 
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
+  declare lastOnline: CreationOptional<Date>;
   
   declare removeRefreshToken: HasManyRemoveAssociationMixin<RefreshToken, number>
   declare createRefreshToken: HasManyCreateAssociationMixin<RefreshToken>
@@ -37,6 +39,8 @@ export class User extends Model<InferAttributes<User>, InferCreationAttributes<U
   
   declare createMessage: HasManyCreateAssociationMixin<Message>
   declare getMessages: HasManyGetAssociationsMixin<Message>;  
+
+  declare Chats?:NonAttribute<Chat[]>;
 }
 export class RefreshToken extends Model<InferAttributes<RefreshToken>, InferCreationAttributes<RefreshToken>> {
   declare id: CreationOptional<number>;
@@ -51,7 +55,10 @@ export class RefreshToken extends Model<InferAttributes<RefreshToken>, InferCrea
   declare createdAt: CreationOptional<Date>;
 }
 export class Chat extends Model<InferAttributes<Chat>, InferCreationAttributes<Chat>> {
-  declare id: CreationOptional<number>
+  declare id: CreationOptional<number>;
+  declare link: string | null;
+  declare name: string | null;
+  declare type: "private"|"channel"|"group";
 
   declare createdAt: CreationOptional<Date>;
   
@@ -61,6 +68,8 @@ export class Chat extends Model<InferAttributes<Chat>, InferCreationAttributes<C
   declare getUsers: BelongsToManyGetAssociationsMixin<User>;
   declare removeUser: BelongsToManyRemoveAssociationMixin<User, number>;
   declare addUser: BelongsToManyAddAssociationMixin<User, number>;
+
+  declare Users?:NonAttribute<User[]>;
 }
 export class Message extends Model<InferAttributes<Message>, InferCreationAttributes<Message>> {
   declare id: CreationOptional<number>
@@ -111,7 +120,8 @@ User.init({
     allowNull: false
   },
   createdAt: DataTypes.DATE,
-  updatedAt: DataTypes.DATE
+  updatedAt: DataTypes.DATE,
+  lastOnline: DataTypes.DATE
 }, {
   sequelize,
   modelName: "User"
@@ -146,10 +156,25 @@ Chat.init({
     autoIncrement: true,
     primaryKey: true
   },
+  link:{
+    type: DataTypes.STRING,
+    unique: true
+  },
+  name:{
+    type:DataTypes.STRING,
+        
+  },
+  type:{
+    type:DataTypes.ENUM("private","channel","group"),
+    allowNull:false
+  },
   createdAt: DataTypes.DATE,
 },{
   sequelize,
   modelName: "Chat",
+  indexes:[
+    {fields:["name"]}
+  ],
   timestamps:true,
   createdAt:true,
   updatedAt:false

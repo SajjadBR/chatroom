@@ -1,19 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { io,Socket } from "socket.io-client";
 import { Tokens, User } from "./App";
 import ChatPage from "./chat/ChatPage";
 import SearchChat from "./chat/SearchChat";
 import Sidebar from "./chat/Sidebar";
-import PromiseView from "./PromiseView";
 
-function startSocket(){
-    return new Promise<Socket>((resolve,reject) => {
-        const socket = io (window.origin+"1",{ auth: {token: Tokens.access}})
-        socket.once("connect", () => resolve(socket));
-        socket.once("connect_error", () => reject({message:"connection error"}));
-    });
-}
 export function pEmit(socket:Socket,ev:string,...args:any[]){
     return new Promise<any>((resolve,reject) => {
         socket.emit(ev,...args,(res:any) => {
@@ -39,38 +31,49 @@ export type Contact = {
     name: string,
 };
 
-function GetChats({user,socket}:{user:User,socket:Socket}){
-    function sw({data}:{data:any}){
-        const chats = data.chats;
+const Notification = memo(({socket}:{socket:Socket}) => {
+    const [message,setMessage] = useState<any>()
+    const closeButtonRef = useRef<HTMLButtonElement>(null);
+    useEffect(()=>{
+        socket.on("newMessage",(m:any) => {
+            console.log(m);
+            
+            setMessage(m);
 
-        return(
-            <SocketWrapper2 user={user} socket={socket} initialChats={chats} />
-        )
-    }
+            setTimeout(() => {
+                console.log("close");
+                
+                closeButtonRef.current!.click();
+            }, 5000);
+        });
+    },[socket])
 
     return(
-        <PromiseView promise={pEmit(socket,"getChats")} Result={sw}>
-            <h2>Getting your chats...</h2>
-        </PromiseView>
+        <>
+        {message &&
+        <div className="toast-container position-fixed bottom-0 end-0 p-3">
+            <div id="notification" className="toast toast-primary show" role="alert" aria-live="assertive" aria-atomic="true">
+                <div className="toast-header">
+                    <svg className="bd-placeholder-img rounded me-2" width="20" height="20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" preserveAspectRatio="xMidYMid slice" focusable="false">
+                        <rect width="100%" height="100%" fill="#007aff"></rect>
+                    </svg>
+                    <strong className="me-auto">{message.UserId}</strong>
+                    <small>{message.createdAt}</small>
+                    <button ref={closeButtonRef} type="button" className="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+                <div className="toast-body">
+                    {JSON.stringify(message)}
+                </div>
+            </div>
+        </div>
+        }
+        </>
     )
-}
+})
 
 export default function SocketWrapper({user}:{user:User}) {
-
-    function gc({data}:{data:any}){
-        return(
-            <GetChats user={user} socket={data} />
-        )
-    }
-    
-    return(
-        <PromiseView promise={startSocket()} Result={gc}>
-            <h2>Connecting...</h2>
-        </PromiseView>
-    )
-}
-function SocketWrapper2({user,socket,initialChats}:{user:User,socket:Socket,initialChats:Chat[]}) {
     console.log("SW");
+    const socket = useMemo(()=> io(window.origin+"1",{ auth: {token: Tokens.access}}),[])
     
     const {pathname} = useLocation();
     const {showChats,username} = useMemo(() => {
@@ -79,11 +82,9 @@ function SocketWrapper2({user,socket,initialChats}:{user:User,socket:Socket,init
         return {showChats:x,username:y}
     },[pathname]);
  
-    const [chats,setChats] = useState<Chat[]>(initialChats);
-    
-    const exist = chats?.find(c=>c.username === username);
+    const [chats,setChats] = useState<Chat[]>();
+    const [chat,setChat] = useState<Chat>();
 
-    console.log(chats,pathname);
     
     const deleteChat = useCallback((id:number)=>{
         socket.emit("deleteChat",id, (res:any) => {
@@ -93,51 +94,80 @@ function SocketWrapper2({user,socket,initialChats}:{user:User,socket:Socket,init
         });
     },[socket]);
 
-    const startChat = useCallback((id:number)=>{
-        return pEmit(socket,"startChat",id).then((res:any) => {
-            setChats(current => [...current!, res.chat]);
-            return res;
-        });
-    },[socket]);
     
-    const sendMessage = useCallback((text:string,chat:Chat,setChat?:((chat:Chat)=>void)) => {
+    const sendMessage = useCallback((text:string) => {
+        if(!chat) return;
         if(chat.id !== 0) {
             socket.emit("sendMessage", chat.id, text);
             return;
         }
 
-        startChat(chat.contactId).then(res => {
+        pEmit(socket,"startChat",chat.contactId).then((res:any) => {
+            setChats(current => [...current!, res.chat]);
             socket.emit("sendMessage", res.chat.id, text);
-            setChat?.(res.chat);
-        })
+            setChat(res.chat);
+        });
         
-    },[socket,startChat]);
+    },[socket,chat]);
 
 
     useEffect(() => {
-        socket.on("newChat", (chat) => {
+        socket.emit("getChats", (res:any)=> {
+            if(res.error) throw new Error(res.error);
+            setChats(res.chats);
+        });
+
+        function onNewChat(chat:Chat) {
             setChats(current => [...current!,chat]);
-        }); 
-        
+        }
+        socket.on("newChat", onNewChat);
+
+        console.log(socket.listeners("newChat"));
+
         return () => {
-            socket.removeAllListeners("newChat");
+            socket.removeListener("newChat",onNewChat);
         }
     },[socket]);
 
-    if(!showChats)return null;
+    useEffect(() => {
+        if(!username) {
+            if(chat) setChat(undefined);
+            return;
+        }
+
+        if(chats === undefined) return;
+        const exist = chats.find(c=>c.username === username);
+        if(exist) return setChat(exist);
+        
+        socket.emit("getChat", username, (res:any) => {
+            if(res.error) {
+                if(res.error === "404") {
+                    // navigate("/chats");
+                }
+                return console.error(res.error);
+            }
+            setChat(res.chat);
+        });
+
+// eslint-disable-next-line
+    },[username,chats]);
+
 
     return (
         <>
+        {showChats &&
         <div className="w-100 h-100 overflow-hidden">
             {pathname === "/chats/search" ?
             <SearchChat socket={socket} />:
             (
                 (!username) ?
                 <Sidebar deleteChat={deleteChat} chats={chats} />:
-                <ChatPage user={user} sendMessage={sendMessage} currentChat={exist || {id:0,username,name:"",type:"private",contactId:0}} socket={socket} />
+                <ChatPage user={user} sendMessage={sendMessage} chat={chat} socket={socket} />
             )
             }
         </div>
+        }
+        <Notification socket={socket} />
         </>
     )
 }
@@ -166,23 +196,4 @@ function SocketWrapper2({user,socket,initialChats}:{user:User,socket:Socket,init
             setConnected(false);
         });
 
-*/
-
-
-/*
-
-        <div className="toast-container position-fixed bottom-0 end-0 p-3">
-            <div id="notification" className="toast" role="alert" aria-live="assertive" aria-atomic="true">
-                <div className="toast-header">
-                {// <img src="..." className="rounded me-2" alt="...">
-                }
-                <strong className="me-auto">Bootstrap</strong>
-                <small>11 mins ago</small>
-                <button type="button" className="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-                </div>
-                <div className="toast-body">
-                Hello, world! This is a toast message.
-                </div>
-            </div>
-        </div>
 */

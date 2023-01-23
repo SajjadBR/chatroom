@@ -4,7 +4,7 @@ exports.Message = exports.Chat = exports.RefreshToken = exports.User = exports.s
 const sequelize_1 = require("sequelize");
 const bcrypt_1 = require("bcrypt");
 // require('./sample')
-exports.sequelize = new sequelize_1.Sequelize("rex", "root", "", {
+exports.sequelize = new sequelize_1.Sequelize("rex2", "root", "", {
     host: "localhost",
     dialect: "mysql",
     logging: false
@@ -59,7 +59,8 @@ User.init({
         allowNull: false
     },
     createdAt: sequelize_1.DataTypes.DATE,
-    updatedAt: sequelize_1.DataTypes.DATE
+    updatedAt: sequelize_1.DataTypes.DATE,
+    lastOnline: sequelize_1.DataTypes.DATE
 }, {
     sequelize: exports.sequelize,
     modelName: "User"
@@ -92,10 +93,24 @@ Chat.init({
         autoIncrement: true,
         primaryKey: true
     },
+    link: {
+        type: sequelize_1.DataTypes.STRING,
+        unique: true
+    },
+    name: {
+        type: sequelize_1.DataTypes.STRING,
+    },
+    type: {
+        type: sequelize_1.DataTypes.ENUM("private", "channel", "group"),
+        allowNull: false
+    },
     createdAt: sequelize_1.DataTypes.DATE,
 }, {
     sequelize: exports.sequelize,
     modelName: "Chat",
+    indexes: [
+        { fields: ["name"] }
+    ],
     timestamps: true,
     createdAt: true,
     updatedAt: false

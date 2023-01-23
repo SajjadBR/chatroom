@@ -19,18 +19,16 @@ type MessagesProps = {
 
 
 function Messages({chat,socket,user}:MessagesProps){
-    let [messages, setMessages] = useState<Message[]>([]);
+    let [messages, setMessages] = useState<Message[]>();
     
-    function onNewMessage(newMessage:any) {
-        console.log(newMessage);
-        
-        setMessages(current => [...current, newMessage]);
-    }
-
     useEffect(() => {
         if(chat.id === 0) return;
+        function onNewMessage(newMessage:any) {
+            console.log(newMessage);
+            
+            setMessages(current => [...current!, newMessage]);
+        }
 
-        socket.emit("subscribeChat", chat.id);
         socket.on("newMessage", onNewMessage);
 
         socket.emit("getMessages", chat.id, (res:any) => {
@@ -43,15 +41,20 @@ function Messages({chat,socket,user}:MessagesProps){
 
         return () => {            
             socket.removeListener("newMessage", onNewMessage);
-            socket.emit("unsubscribeChat", chat.id);
         }
         
     },[chat.id])
 
     return(
         <ul className="m-0 d-flex flex-column px-3 flex-grow-1 overflow-y-auto">
-            {messages.map((message) => <MessageRow chat={chat} sent={message.UserId === user.id} message={message} key={message.id} />)}
-            
+            {messages?
+            messages.map((message) => <MessageRow chat={chat} sent={message.UserId === user.id} message={message} key={message.id} />):
+            <>
+            <div className="col-3 m-1 h-25 placeholder rounded" aria-hidden="true"></div>
+            <div className="col-5 m-1 h-50 placeholder rounded" aria-hidden="true"></div>
+            <div className="col-2 m-1 h-25 placeholder rounded" aria-hidden="true"></div>
+            </>
+            }
         </ul>
     );
 }
