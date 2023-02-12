@@ -213,7 +213,7 @@ class SocketConnection {
     });
     console.log(message.toJSON());
     
-    this.io.in(["uid"+chat.Users![0].id]).emit("newMessage",message.toJSON())
+    this.io.in(["uid"+chat.Users![0].id,"uid"+user.id]).emit("newMessage",message.toJSON())
 
   }
   
